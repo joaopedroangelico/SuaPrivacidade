@@ -35,7 +35,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -87,14 +89,17 @@ private const val PX_ICONE = 128
 @Composable
 fun IconeApp(pacote: String?, modifier: Modifier = Modifier, tamanho: Dp = 44.dp, reserva: ImageVector = Icons.Rounded.Apps) {
     val context = LocalContext.current
-    val bitmap by produceState(pacote?.let { cacheIcones.get(it) }, pacote) {
-        if (value == null && pacote != null) {
-            value = withContext(Dispatchers.IO) {
+    // O estado é recriado quando o pacote muda: numa lista que troca de conteúdo, a mesma posição
+    // não pode continuar mostrando o ícone do app anterior.
+    val bitmap = remember(pacote) { mutableStateOf(pacote?.let { cacheIcones.get(it) }) }
+    LaunchedEffect(pacote) {
+        if (bitmap.value == null && pacote != null) {
+            bitmap.value = withContext(Dispatchers.IO) {
                 Apps.icone(context, pacote)?.toBitmap(PX_ICONE, PX_ICONE)?.asImageBitmap()?.also { cacheIcones.put(pacote, it) }
             }
         }
     }
-    val atual = bitmap
+    val atual = bitmap.value
     if (atual != null) {
         Image(atual, contentDescription = null, modifier = modifier.size(tamanho))
     } else {

@@ -68,6 +68,16 @@ fun formatarTempoDeUso(millis: Long): String {
     }
 }
 
+/** Tempo de tela curto, para caber em cima de uma coluna de gráfico: "45m", "1h28", "6h". */
+fun formatarTempoCurto(millis: Long): String {
+    val minutos = millis / 60_000
+    return when {
+        minutos < 60 -> "${minutos}m"
+        minutos % 60 == 0L -> "${minutos / 60}h"
+        else -> "${minutos / 60}h%02d".format(minutos % 60)
+    }
+}
+
 /** Dados de internet: "0 KB", "820 KB", "45,3 MB", "1,2 GB". */
 fun formatarBytes(bytes: Long): String {
     val kb = bytes / 1024.0

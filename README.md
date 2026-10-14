@@ -8,6 +8,7 @@ App Android que vigia o microfone e a câmera do celular: avisa quando algum app
 
 - **Aviso na hora** quando o microfone ou a câmera ligam com a **tela apagada** ou o **celular bloqueado**, com o app que provavelmente foi o responsável.
 - **Início**: situação agora ("Microfone em uso agora", "Tudo tranquilo hoje"), placar do dia (microfone, câmera, usos suspeitos, notificações) e os usos suspeitos da semana. Tocar num uso mostra os detalhes, leva às permissões do app ou coloca o app sob supervisão.
+- **Bem-estar digital** (na tela inicial): tempo de tela do dia em destaque e comparado com a média da semana, desbloqueios, aberturas de apps e notificações, os últimos 7 dias em colunas (toque num dia para ver os detalhes dele) e os apps mais usados em barras. A tela inicial do celular e a barra do sistema não entram na conta, como no Bem-estar digital do Android.
 - **Supervisão**: escolha apps para acompanhar de perto. Cada um ganha uma ficha com:
   - **microfone e câmera**: aviso a **qualquer** uso fora da tela (não só com a tela apagada) e os últimos usos;
   - **internet**: quanto gastou hoje e nos últimos 7 dias, separando o que foi **em segundo plano**;

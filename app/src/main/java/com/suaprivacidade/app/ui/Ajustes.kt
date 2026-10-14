@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -348,8 +349,8 @@ private fun SecaoSobre() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text("Sobre", style = MaterialTheme.typography.titleMedium)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // O ícone do launcher é adaptativo (não suportado pelo painterResource): monta fundo + desenho,
-            // com o escudo ocupando a mesma proporção do círculo que ocupa no ícone do celular.
+            // O ícone do launcher é adaptativo (não suportado pelo painterResource): monta fundo + desenho.
+            // A camada tem 108 dp, mas o celular mostra só os 72 dp do meio: por isso a escala 1,5.
             Box(
                 Modifier
                     .size(44.dp)
@@ -357,11 +358,11 @@ private fun SecaoSobre() {
                     .background(colorResource(R.color.icone_fundo)),
             ) {
                 Image(
-                    painter = painterResource(R.drawable.ic_launcher_escudo),
+                    painter = painterResource(R.drawable.ic_launcher_frente),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(4.dp),
+                        .scale(1.5f),
                 )
             }
             Column(Modifier.padding(start = 12.dp)) {

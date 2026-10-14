@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Ícone do app (escudo.ico): 60 dp no centro dos 108 dp do ícone adaptativo,
-     para o escudo caber na área segura de qualquer formato (círculo, gota, quadrado). -->
+<!-- Ícone do app (SuaPrivacidade.ico): só os desenhos brancos, sobre o azul de icone_fundo.
+     O desenho ocupa 68 dp dos 108 dp do ícone adaptativo, dentro da área visível de qualquer
+     formato (círculo, gota, quadrado). Gerado a partir do .ico, sem o círculo azul original. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/ic_launcher_escudo"
-    android:inset="24dp" />
+    android:drawable="@drawable/ic_launcher_frente"
+    android:inset="0dp" />

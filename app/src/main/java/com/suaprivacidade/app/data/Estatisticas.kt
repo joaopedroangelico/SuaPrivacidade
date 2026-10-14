@@ -5,10 +5,16 @@ import android.app.usage.NetworkStatsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
+import android.os.Build
 
 /** Tempo de tela e quantas vezes o app foi aberto num período. */
 data class UsoApp(val tempoMillis: Long = 0, val aberturas: Int = 0)
+
+/** Uso do celular num período: por app, e quantas vezes ele foi desbloqueado (null antes do Android 9). */
+data class Tela(val porApp: Map<String, UsoApp> = emptyMap(), val desbloqueios: Int? = null)
 
 /** Bytes de internet (Wi-Fi + dados móveis), com o app aberto e em segundo plano. */
 data class DadosApp(val primeiroPlano: Long = 0, val segundoPlano: Long = 0) {
@@ -22,6 +28,8 @@ private const val ABRIU = UsageEvents.Event.MOVE_TO_FOREGROUND
 private const val SAIU = UsageEvents.Event.MOVE_TO_BACKGROUND
 /** UsageEvents.Event.SCREEN_NON_INTERACTIVE (Android 9+): a tela apagou. */
 private const val TELA_APAGOU = 16
+/** UsageEvents.Event.KEYGUARD_HIDDEN (Android 9+): o celular foi desbloqueado. */
+private const val DESBLOQUEOU = 18
 
 /**
  * Tudo aqui depende do "Acesso ao uso". Sem ele o Android lança SecurityException ou devolve
@@ -29,6 +37,7 @@ private const val TELA_APAGOU = 16
  */
 object Estatisticas {
     private const val JANELA_APP_NA_TELA = 6L * 60 * 60 * 1000
+    private const val ANTES_DO_PERIODO = 3L * 60 * 60 * 1000
 
     /** App com uma tela aberta agora (o último que abriu e ainda não saiu); null se nenhum ou sem acesso. */
     fun appNaTela(context: Context, agoraMillis: Long = System.currentTimeMillis()): String? = runCatching {
@@ -48,12 +57,20 @@ object Estatisticas {
     }.getOrNull()
 
     /** Tempo de tela e aberturas de cada app entre [desde] e [ate]. */
-    fun uso(context: Context, desde: Long, ate: Long): Map<String, UsoApp> = runCatching {
+    fun uso(context: Context, desde: Long, ate: Long): Map<String, UsoApp> = tela(context, desde, ate).porApp
+
+    /**
+     * Tempo de tela de cada app, aberturas e desbloqueios entre [desde] e [ate]. Lê também as
+     * últimas horas antes de [desde], para contar o app que já estava aberto (ex.: virada da
+     * meia-noite), mas só soma o tempo que cai dentro do período.
+     */
+    fun tela(context: Context, desde: Long, ate: Long): Tela = runCatching {
         val usm = context.getSystemService(UsageStatsManager::class.java)
-        val eventos = usm.queryEvents(desde, ate)
+        val eventos = usm.queryEvents(desde - ANTES_DO_PERIODO, ate)
         val e = UsageEvents.Event()
         val tempo = HashMap<String, Long>()
         val aberturas = HashMap<String, Int>()
+        var desbloqueios = 0
         var atual: String? = null
         var inicioAtual = 0L
         // Trocar de tela dentro do mesmo app não conta como abrir de novo.
@@ -61,7 +78,8 @@ object Estatisticas {
 
         fun fecharAtual(momento: Long) {
             val pacote = atual ?: return
-            tempo[pacote] = (tempo[pacote] ?: 0) + (momento - inicioAtual).coerceAtLeast(0)
+            val dentro = minOf(momento, ate) - maxOf(inicioAtual, desde)
+            if (dentro > 0) tempo[pacote] = (tempo[pacote] ?: 0) + dentro
             atual = null
         }
 
@@ -73,7 +91,7 @@ object Estatisticas {
                     fecharAtual(e.timeStamp)
                     atual = pacote
                     inicioAtual = e.timeStamp
-                    if (pacote != ultimoAberto) aberturas[pacote] = (aberturas[pacote] ?: 0) + 1
+                    if (pacote != ultimoAberto && e.timeStamp >= desde) aberturas[pacote] = (aberturas[pacote] ?: 0) + 1
                     ultimoAberto = pacote
                 }
                 SAIU -> if (pacote == atual) fecharAtual(e.timeStamp)
@@ -81,11 +99,29 @@ object Estatisticas {
                     fecharAtual(e.timeStamp)
                     ultimoAberto = null
                 }
+                DESBLOQUEOU -> if (e.timeStamp >= desde) desbloqueios++
             }
         }
         fecharAtual(ate)
-        (tempo.keys + aberturas.keys).associateWith { UsoApp(tempo[it] ?: 0, aberturas[it] ?: 0) }
-    }.getOrDefault(emptyMap())
+        Tela(
+            porApp = (tempo.keys + aberturas.keys).associateWith { UsoApp(tempo[it] ?: 0, aberturas[it] ?: 0) },
+            // O evento de desbloqueio só existe a partir do Android 9.
+            desbloqueios = desbloqueios.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.P },
+        )
+    }.getOrDefault(Tela())
+
+    /**
+     * Apps cujo tempo não entra no "tempo de tela" (como no Bem-estar digital do Android): a tela
+     * inicial, a barra do sistema e o próprio Android.
+     */
+    fun foraDoTempoDeTela(context: Context): Set<String> {
+        val inicio = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val telasIniciais = runCatching {
+            context.packageManager.queryIntentActivities(inicio, PackageManager.MATCH_DEFAULT_ONLY)
+                .map { it.activityInfo.packageName }
+        }.getOrDefault(emptyList())
+        return telasIniciais.toSet() + setOf("android", "com.android.systemui")
+    }
 
     /** Internet gasta por cada app (pelo uid do Android) entre [desde] e [ate]. */
     @Suppress("DEPRECATION")

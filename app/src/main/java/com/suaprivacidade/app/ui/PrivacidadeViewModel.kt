@@ -79,6 +79,14 @@ data class InfoSupervisionado(
 /** Tempo de tela e internet do dia, lidos do Android (dependem do "Acesso ao uso"). */
 data class ResumoApp(val uso: UsoApp = UsoApp(), val dados: DadosApp = DadosApp())
 
+/** Um app no Bem-estar digital: quanto tempo ficou na tela e quantas vezes foi aberto. */
+data class AppTela(val pacote: String, val nome: String, val uso: UsoApp)
+
+/** Um dia do Bem-estar digital: tempo de tela total, desbloqueios e apps do mais usado ao menos usado. */
+data class DiaTela(val dia: LocalDate, val totalMillis: Long, val desbloqueios: Int?, val apps: List<AppTela>) {
+    val aberturas: Int get() = apps.sumOf { it.uso.aberturas }
+}
+
 /** Ficha completa de um app supervisionado. */
 data class Ficha(
     val usoHoje: UsoApp,
@@ -172,6 +180,10 @@ class PrivacidadeViewModel(app: Application) : AndroidViewModel(app) {
     /** Tempo de tela e internet de hoje de cada app supervisionado. */
     private val _resumosApps = MutableStateFlow<Map<String, ResumoApp>>(emptyMap())
     val resumosApps: StateFlow<Map<String, ResumoApp>> = _resumosApps
+
+    /** Os últimos 7 dias do Bem-estar digital, do mais antigo para hoje; null até carregar. */
+    private val _bemEstar = MutableStateFlow<List<DiaTela>?>(null)
+    val bemEstar: StateFlow<List<DiaTela>?> = _bemEstar
 
     init {
         // Limpa o que passou do prazo mesmo se a vigia estiver parada.
@@ -287,6 +299,34 @@ class PrivacidadeViewModel(app: Application) : AndroidViewModel(app) {
                 pacotes.associateWith { p ->
                     ResumoApp(uso[p] ?: UsoApp(), Apps.uid(context, p)?.let { dados[it] } ?: DadosApp())
                 }
+            }
+        }
+    }
+
+    /**
+     * Relê o tempo de tela. Os dias anteriores não mudam: só são lidos de novo quando o dia
+     * vira (ou na primeira vez); hoje é sempre relido.
+     */
+    fun atualizarBemEstar() {
+        viewModelScope.launch {
+            _bemEstar.value = withContext(Dispatchers.IO) {
+                val context = getApplication<Application>()
+                val hoje = LocalDate.now()
+                val agora = System.currentTimeMillis()
+                val fora = Estatisticas.foraDoTempoDeTela(context)
+                fun lerDia(dia: LocalDate): DiaTela {
+                    val tela = Estatisticas.tela(context, dia.inicioMillis(), minOf(dia.plusDays(1).inicioMillis(), agora))
+                    val apps = tela.porApp
+                        .filter { (pacote, uso) -> pacote !in fora && uso.tempoMillis >= 1000 }
+                        .map { (pacote, uso) -> AppTela(pacote, Apps.nome(context, pacote), uso) }
+                        .sortedByDescending { it.uso.tempoMillis }
+                    return DiaTela(dia, apps.sumOf { it.uso.tempoMillis }, tela.desbloqueios, apps)
+                }
+                val anteriores = _bemEstar.value
+                    ?.takeIf { it.lastOrNull()?.dia == hoje }
+                    ?.dropLast(1)
+                    ?: (6 downTo 1).map { lerDia(hoje.minusDays(it.toLong())) }
+                anteriores + lerDia(hoje)
             }
         }
     }

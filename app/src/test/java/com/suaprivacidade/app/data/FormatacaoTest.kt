@@ -22,6 +22,14 @@ class FormatacaoTest {
     }
 
     @Test
+    fun tempoCurto() {
+        assertEquals("45m", formatarTempoCurto(45 * 60_000))
+        assertEquals("1h28", formatarTempoCurto(88 * 60_000))
+        assertEquals("6h", formatarTempoCurto(6 * 60 * 60_000))
+        assertEquals("2h05", formatarTempoCurto(125 * 60_000))
+    }
+
+    @Test
     fun bytes() {
         assertEquals("0 KB", formatarBytes(0))
         assertEquals("820 KB", formatarBytes(820 * 1024))

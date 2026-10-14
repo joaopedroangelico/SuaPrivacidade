@@ -77,6 +77,7 @@ import com.suaprivacidade.app.data.Apps
 import com.suaprivacidade.app.data.Preferencias
 import com.suaprivacidade.app.data.Sensor
 import com.suaprivacidade.app.data.formatarDiaLongo
+import com.suaprivacidade.app.data.inicioMillis
 import com.suaprivacidade.app.ui.theme.escuro
 import com.suaprivacidade.app.vigia.Acessos
 import com.suaprivacidade.app.vigia.Vigia
@@ -105,6 +106,7 @@ fun TelaPrincipal(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val apps by vm.apps.collectAsStateWithLifecycle()
     val resumosApps by vm.resumosApps.collectAsStateWithLifecycle()
+    val bemEstar by vm.bemEstar.collectAsStateWithLifecycle()
     val vigiaAtiva by Vigia.ativa.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -149,6 +151,11 @@ fun TelaPrincipal(
         onPauseOrDispose {}
     }
     LaunchedEffect(escolhendo) { if (escolhendo != null) vm.carregarApps() }
+    // Tempo de tela: relido ao abrir o Início, a cada minuto com ele aberto e ao voltar ao app.
+    LifecycleResumeEffect(ui.aba, ui.agora, permissoes.acessoUso) {
+        if (ui.aba == Aba.INICIO && permissoes.acessoUso) vm.atualizarBemEstar()
+        onPauseOrDispose {}
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -214,6 +221,19 @@ fun TelaPrincipal(
                                     }
                                 }
                             }
+                        }
+                        item(key = "bem-estar") {
+                            CartaoBemEstar(
+                                dias = bemEstar,
+                                hoje = ui.agora.toLocalDate(),
+                                temAcessoUso = permissoes.acessoUso,
+                                notificacoesNoDia = { dia ->
+                                    val inicio = dia.inicioMillis()
+                                    val fim = dia.plusDays(1).inicioMillis()
+                                    ui.notificacoes.count { it.postadaMillis in inicio until fim }
+                                },
+                                onPermitir = { Acessos.abrirAcessoUso(context) },
+                            )
                         }
                         item(key = "titulo-alertas") {
                             Text(
