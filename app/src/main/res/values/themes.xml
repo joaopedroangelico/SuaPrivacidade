@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.SuaPrivacidade" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/fundo_janela</item>
+    </style>
+</resources>

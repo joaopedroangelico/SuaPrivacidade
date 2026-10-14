@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Sem INTERNET: o próprio Android impede que qualquer dado saia do celular. -->
+
+    <!-- Avisos de microfone/câmera e de permissões novas. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "Acesso ao uso": qual app está na tela, tempo de uso e consumo de dados por app.
+         Concedida pelo usuário nas configurações, não por diálogo. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <!-- Ver todos os apps instalados e as permissões de cada um (Auditoria e Supervisão). -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- Pedido para tirar o app da economia de bateria (alguns celulares encerram a vigia). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:name=".SuaPrivacidadeApp"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/regras_extracao_dados"
+        android:fullBackupContent="@xml/regras_backup"
+        android:enableOnBackInvokedCallback="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SuaPrivacidade">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- A vigia mora no leitor de notificações: o Android mantém esse serviço ligado (e o religa
+             depois de reiniciar), então não é preciso um serviço em primeiro plano. -->
+        <service
+            android:name=".vigia.VigiaService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
