@@ -181,6 +181,13 @@ class PrivacidadeViewModel(app: Application) : AndroidViewModel(app) {
     private val _resumosApps = MutableStateFlow<Map<String, ResumoApp>>(emptyMap())
     val resumosApps: StateFlow<Map<String, ResumoApp>> = _resumosApps
 
+    /**
+     * Notificações marcadas no Histórico para apagar; null fora do modo de seleção. O modo
+     * continua aberto mesmo com zero marcadas, até o usuário sair dele.
+     */
+    private val _selecao = MutableStateFlow<Set<Long>?>(null)
+    val selecao: StateFlow<Set<Long>?> = _selecao
+
     /** Os últimos 7 dias do Bem-estar digital, do mais antigo para hoje; null até carregar. */
     private val _bemEstar = MutableStateFlow<List<DiaTela>?>(null)
     val bemEstar: StateFlow<List<DiaTela>?> = _bemEstar
@@ -263,9 +270,15 @@ class PrivacidadeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun navegar(mudar: (Navegacao) -> Navegacao) = navegacao.update(mudar)
 
-    fun definirAba(aba: Aba) = navegar { Navegacao(aba, it.tipoHistorico, it.filtroApp, it.abertas) }
+    fun definirAba(aba: Aba) {
+        if (aba != Aba.HISTORICO) sairDaSelecao()
+        navegar { Navegacao(aba, it.tipoHistorico, it.filtroApp, it.abertas) }
+    }
 
-    fun definirTipoHistorico(tipo: TipoHistorico) = navegar { Navegacao(it.aba, tipo, it.filtroApp, it.abertas) }
+    fun definirTipoHistorico(tipo: TipoHistorico) {
+        if (tipo != TipoHistorico.NOTIFICACOES) sairDaSelecao()
+        navegar { Navegacao(it.aba, tipo, it.filtroApp, it.abertas) }
+    }
 
     /** Abre o Histórico mostrando só o que é de [pacote]. */
     fun verHistoricoDe(pacote: String, tipo: TipoHistorico) =
@@ -276,6 +289,46 @@ class PrivacidadeViewModel(app: Application) : AndroidViewModel(app) {
     fun alternarGaveta(chave: String) = navegar {
         val base = it.abertas ?: ui.value.abertas
         Navegacao(it.aba, it.tipoHistorico, it.filtroApp, if (chave in base) base - chave else base + chave)
+    }
+
+    // --- Seleção de notificações para apagar ---
+
+    /** Entra no modo de seleção, já marcando [id] se vier (toque longo numa notificação). */
+    fun entrarNaSelecao(id: Long? = null) {
+        _selecao.value = setOfNotNull(id)
+    }
+
+    fun sairDaSelecao() {
+        _selecao.value = null
+    }
+
+    fun alternarSelecao(id: Long) {
+        _selecao.update { atual -> atual?.let { if (id in it) it - id else it + id } }
+    }
+
+    /** Marca (ou desmarca) várias de uma vez: um dia inteiro ou todas as visíveis. */
+    fun marcarVarias(ids: Collection<Long>, marcar: Boolean) {
+        _selecao.update { atual -> atual?.let { if (marcar) it + ids else it - ids.toSet() } }
+    }
+
+    /** Apaga as notificações marcadas (depois da senha do celular); desfazer traz de volta. */
+    fun apagarSelecionadas() {
+        val ids = _selecao.value?.toList().orEmpty()
+        _selecao.value = null
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val dao = banco.notificacaoDao()
+            // O SQLite aceita no máximo 999 parâmetros por consulta.
+            val apagadas = banco.withTransaction {
+                ids.chunked(500).flatMap { lote -> dao.porIds(lote).also { dao.apagar(lote) } }
+            }
+            val n = apagadas.size
+            eventos.send(
+                Desfazer(if (n == 1) "1 notificação apagada" else "$n notificações apagadas") {
+                    viewModelScope.launch { dao.inserirTodas(apagadas) }
+                },
+            )
+        }
     }
 
     // --- Apps instalados e estatísticas ---

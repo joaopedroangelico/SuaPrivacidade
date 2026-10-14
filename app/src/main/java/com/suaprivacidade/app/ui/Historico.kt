@@ -2,6 +2,14 @@ package com.suaprivacidade.app.ui
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.TriStateCheckbox
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -165,17 +173,40 @@ fun GavetaDiaUsos(
     }
 }
 
+/**
+ * Uma notificação do histórico. Fora do modo de seleção, tocar expande o texto e o toque longo
+ * entra na seleção já marcando esta; dentro dele, tocar marca/desmarca.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun LinhaNotificacao(n: Notificacao, nome: String) {
+fun LinhaNotificacao(
+    n: Notificacao,
+    nome: String,
+    selecao: Set<Long>?,
+    onAlternarSelecao: () -> Unit,
+    onEntrarNaSelecao: () -> Unit,
+) {
     val cores = MaterialTheme.colorScheme
     var expandida by remember { mutableStateOf(false) }
+    val selecionando = selecao != null
+    val marcada = selecao?.contains(n.id) == true
     Row(
         verticalAlignment = Alignment.Top,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .clickable(enabled = !n.oculta) { expandida = !expandida }
-            .padding(horizontal = 12.dp, vertical = 10.dp)
+            .background(if (marcada) cores.primary.copy(alpha = 0.12f) else Color.Transparent)
+            .combinedClickable(
+                onClick = {
+                    when {
+                        selecionando -> onAlternarSelecao()
+                        !n.oculta -> expandida = !expandida
+                    }
+                },
+                onLongClick = { if (selecionando) onAlternarSelecao() else onEntrarNaSelecao() },
+                onLongClickLabel = "Selecionar",
+            )
+            .padding(start = 12.dp, end = if (selecionando) 0.dp else 12.dp, top = 10.dp, bottom = 10.dp)
             .animateContentSize(),
     ) {
         Text(
@@ -226,6 +257,9 @@ fun LinhaNotificacao(n: Notificacao, nome: String) {
                 )
             }
         }
+        if (selecionando) {
+            Checkbox(checked = marcada, onCheckedChange = { onAlternarSelecao() })
+        }
     }
 }
 
@@ -235,7 +269,11 @@ fun GavetaDiaNotificacoes(
     hoje: LocalDate,
     aberta: Boolean,
     nome: (String?) -> String,
+    selecao: Set<Long>?,
     onAlternar: () -> Unit,
+    onAlternarSelecao: (Long) -> Unit,
+    onEntrarNaSelecao: (Long) -> Unit,
+    onMarcarDia: (List<Long>, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val cores = MaterialTheme.colorScheme
@@ -244,21 +282,48 @@ fun GavetaDiaNotificacoes(
     val principais = dia.notificacoes.groupingBy { it.pacote }.eachCount()
         .entries.sortedByDescending { it.value }.take(3).joinToString(", ") { nome(it.key) }
     var limite by remember { mutableIntStateOf(LIMITE_INICIAL) }
+    val ids = dia.notificacoes.map { it.id }
+    val marcadas = selecao?.let { s -> ids.count { it in s } } ?: 0
     GavetaBase(
         aberta = aberta,
         onAlternar = onAlternar,
         alerta = false,
         icone = { IconeRedondo(Icons.Rounded.Event, cores.primary) },
         titulo = nomeDoDia(dia.dia, hoje),
-        subtitulo = "de ${contar(apps.size, "app", "apps")} · mais: $principais",
+        subtitulo = if (selecao != null) {
+            "$marcadas de ${dia.notificacoes.size} marcadas"
+        } else {
+            "de ${contar(apps.size, "app", "apps")} · mais: $principais"
+        },
         etiqueta = null,
-        lateral = { Contador(dia.notificacoes.size.toString(), if (dia.notificacoes.size == 1) "notificação" else "notificações") },
+        lateral = {
+            if (selecao != null) {
+                // Marca ou desmarca o dia inteiro (inclusive as ainda escondidas em "Mostrar mais").
+                TriStateCheckbox(
+                    state = when (marcadas) {
+                        0 -> ToggleableState.Off
+                        ids.size -> ToggleableState.On
+                        else -> ToggleableState.Indeterminate
+                    },
+                    onClick = { onMarcarDia(ids, marcadas < ids.size) },
+                    modifier = Modifier.semantics { contentDescription = "Marcar o dia inteiro" },
+                )
+            } else {
+                Contador(dia.notificacoes.size.toString(), if (dia.notificacoes.size == 1) "notificação" else "notificações")
+            }
+        },
         modifier = modifier,
     ) {
         dia.notificacoes.take(limite).forEachIndexed { i, n ->
             key(n.id) {
                 if (i > 0) Divisoria()
-                LinhaNotificacao(n, nome(n.pacote))
+                LinhaNotificacao(
+                    n = n,
+                    nome = nome(n.pacote),
+                    selecao = selecao,
+                    onAlternarSelecao = { onAlternarSelecao(n.id) },
+                    onEntrarNaSelecao = { onEntrarNaSelecao(n.id) },
+                )
             }
         }
         BotaoMostrarMais(dia.notificacoes.size, limite) { limite += LIMITE_INICIAL }

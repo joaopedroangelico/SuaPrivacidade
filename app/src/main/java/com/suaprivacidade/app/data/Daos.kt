@@ -45,6 +45,15 @@ interface NotificacaoDao {
     @Query("UPDATE notificacoes SET removidaMillis = :millis WHERE chave = :chave AND removidaMillis IS NULL")
     suspend fun marcarRemovida(chave: String, millis: Long)
 
+    @Query("SELECT * FROM notificacoes WHERE id IN (:ids)")
+    suspend fun porIds(ids: List<Long>): List<Notificacao>
+
+    @Query("DELETE FROM notificacoes WHERE id IN (:ids)")
+    suspend fun apagar(ids: List<Long>)
+
+    @Insert
+    suspend fun inserirTodas(notificacoes: List<Notificacao>)
+
     @Query("DELETE FROM notificacoes WHERE postadaMillis < :millis")
     suspend fun apagarAntes(millis: Long)
 

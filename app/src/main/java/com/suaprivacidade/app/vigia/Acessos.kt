@@ -34,6 +34,41 @@ object Acessos {
     fun semEconomiaDeBateria(context: Context): Boolean =
         context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
 
+    /** Xiaomi, Redmi e POCO (MIUI/HyperOS): têm o "Início automático", desligado por padrão. */
+    val ehXiaomi: Boolean
+        get() = listOf(Build.MANUFACTURER, Build.BRAND).any { marca ->
+            marca.lowercase() in setOf("xiaomi", "redmi", "poco")
+        }
+
+    /**
+     * "Início automático" da Xiaomi: sem ele, a MIUI não deixa o Android religar a vigia depois que
+     * o app é encerrado. Não há API pública; a MIUI guarda isso na operação 10008 do AppOps
+     * (0 = permitido). Devolve true fora da Xiaomi e null quando não dá para ler.
+     */
+    fun temInicioAutomatico(context: Context): Boolean? {
+        if (!ehXiaomi) return true
+        return runCatching {
+            val ops = context.getSystemService(AppOpsManager::class.java)
+            val metodo = AppOpsManager::class.java.getMethod(
+                "checkOpNoThrow",
+                Int::class.javaPrimitiveType,
+                Int::class.javaPrimitiveType,
+                String::class.java,
+            )
+            metodo.invoke(ops, OP_INICIO_AUTOMATICO_MIUI, Process.myUid(), context.packageName) as Int == AppOpsManager.MODE_ALLOWED
+        }.getOrNull()
+    }
+
+    /** Tela "Início automático" da Xiaomi; se não existir, "Informações do app". */
+    fun abrirInicioAutomatico(context: Context) {
+        val miui = Intent().setComponent(
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+        )
+        if (!abrir(context, miui)) abrirInformacoesDoApp(context)
+    }
+
+    private const val OP_INICIO_AUTOMATICO_MIUI = 10008
+
     private fun pacote(context: Context) = Uri.parse("package:${context.packageName}")
 
     fun abrirLeitorNotificacoes(context: Context) {

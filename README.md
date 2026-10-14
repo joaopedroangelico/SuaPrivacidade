@@ -17,9 +17,10 @@ App Android que vigia o microfone e a câmera do celular: avisa quando algum app
   - **notificações** enviadas, com atalho para elas no histórico.
 - **Histórico** em gavetas por dia, com filtro por app:
   - **Microfone e câmera**: horário, duração, app provável e a situação (com o app aberto, fora da tela, tela apagada, em ligação, barrado pelo Android).
-  - **Notificações**: app, horário, título e texto de cada notificação recebida (toque para ver o texto inteiro). Apps marcados como **texto oculto** ficam só com o app e o horário.
+  - **Notificações**: app, horário, título e texto de cada notificação recebida (toque para ver o texto inteiro). Apps marcados como **texto oculto** ficam só com o app e o horário. Para **apagar**, toque em "Selecionar" (ou dê um toque longo numa notificação) e marque uma a uma, um dia inteiro ou **todas** de uma vez.
 - **Auditoria**: todos os apps com permissão de microfone e/ou câmera, com o último uso registrado. Um toque abre a tela de permissões do app no Android, para trocar para "Perguntar sempre" ou "Não permitir".
 - **Ajustes**: tema, prazo do histórico (7, 30 ou 90 dias; padrão 30), apps com texto oculto, permissões, armazenamento e "apagar todo o histórico".
+- **Senha para apagar**: apagar notificações ou o histórico inteiro pede a senha de bloqueio do celular (PIN, padrão ou senha).
 - **Temas**: Sistema, Lavanda, Menta, Pêssego, Oceano (padrão) e Rosé, no modo claro/escuro do celular.
 
 **Privacidade:** os dados ficam só no celular. O app não tem permissão de internet, fica fora do backup na nuvem e nunca liga o microfone nem a câmera. Veja a [Política de Privacidade](PRIVACIDADE.md).

@@ -15,6 +15,9 @@
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- Tela de verificação do sistema, para pedir a senha do celular antes de apagar o histórico
+         (só PIN, padrão ou senha; o app não usa a digital). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Pedido para tirar o app da economia de bateria (alguns celulares encerram a vigia). -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 

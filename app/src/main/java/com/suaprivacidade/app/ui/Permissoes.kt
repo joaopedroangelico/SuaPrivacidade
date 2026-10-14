@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.QueryStats
+import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -41,6 +42,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.suaprivacidade.app.ui.theme.aviso
 import com.suaprivacidade.app.ui.theme.sucesso
 import com.suaprivacidade.app.vigia.Acessos
+import com.suaprivacidade.app.vigia.VigiaService
 
 /** O que o Android permite ao app. O leitor de notificações é essencial: é onde a vigia roda. */
 data class EstadoPermissoes(
@@ -48,8 +50,10 @@ data class EstadoPermissoes(
     val acessoUso: Boolean = true,
     val notificacoes: Boolean = true,
     val bateria: Boolean = true,
+    /** "Início automático" da Xiaomi; true fora da Xiaomi, null quando não dá para ler. */
+    val inicioAutomatico: Boolean? = true,
 ) {
-    val faltaAlgo: Boolean get() = !leitor || !acessoUso || !notificacoes || !bateria
+    val faltaAlgo: Boolean get() = !leitor || !acessoUso || !notificacoes || !bateria || inicioAutomatico == false
 }
 
 private fun lerPermissoes(context: Context) = EstadoPermissoes(
@@ -57,6 +61,7 @@ private fun lerPermissoes(context: Context) = EstadoPermissoes(
     acessoUso = Acessos.temAcessoUso(context),
     notificacoes = Acessos.temNotificacoes(context),
     bateria = Acessos.semEconomiaDeBateria(context),
+    inicioAutomatico = Acessos.temInicioAutomatico(context),
 )
 
 /** Estado das permissões, relido sempre que o app volta das configurações do sistema. */
@@ -90,11 +95,15 @@ fun lembrarPedidoNotificacoes(): () -> Unit {
     }
 }
 
-/** Cartão da tela inicial: aparece só quando falta alguma permissão. */
+/**
+ * Cartão da tela inicial: aparece quando falta alguma permissão, ou quando o acesso a
+ * notificações está ligado mas o celular não deixou a vigia iniciar ([vigiaParada]).
+ */
 @Composable
-fun CartaoPermissoes(estado: EstadoPermissoes, modifier: Modifier = Modifier) {
+fun CartaoPermissoes(estado: EstadoPermissoes, vigiaParada: Boolean, modifier: Modifier = Modifier) {
     val cores = MaterialTheme.colorScheme
-    val grave = !estado.leitor
+    val context = LocalContext.current
+    val grave = !estado.leitor || vigiaParada
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
@@ -113,19 +122,41 @@ fun CartaoPermissoes(estado: EstadoPermissoes, modifier: Modifier = Modifier) {
                 modifier = Modifier.size(20.dp),
             )
             Text(
-                if (grave) "A vigia está desligada" else "A vigia está incompleta",
+                when {
+                    !estado.leitor -> "A vigia está desligada"
+                    vigiaParada -> "O celular não deixou a vigia iniciar"
+                    else -> "A vigia está incompleta"
+                },
                 style = MaterialTheme.typography.titleMedium,
                 color = if (grave) cores.onErrorContainer else cores.onSurface,
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
-        ListaPermissoes(estado, mostrarConcedidas = false)
+        if (estado.leitor && vigiaParada) {
+            Text(
+                if (Acessos.ehXiaomi) {
+                    "O acesso a notificações está ligado, mas a Xiaomi bloqueia apps que não têm o " +
+                        "“Início automático”. Ligue-o para o Sua Privacidade e toque em “Tentar de novo”."
+                } else {
+                    "O acesso a notificações está ligado, mas o Android não iniciou a vigia. Tire a " +
+                        "restrição de bateria e toque em “Tentar de novo”."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = cores.onErrorContainer,
+            )
+        }
+        ListaPermissoes(estado, mostrarConcedidas = false, forcarInicioAutomatico = vigiaParada)
+        if (estado.leitor && vigiaParada) {
+            TextButton(onClick = { VigiaService.religar(context) }, modifier = Modifier.align(Alignment.End)) {
+                Text("Tentar de novo")
+            }
+        }
     }
 }
 
 /** Uma linha por permissão, com o botão que leva à tela certa do Android. */
 @Composable
-fun ListaPermissoes(estado: EstadoPermissoes, mostrarConcedidas: Boolean = true) {
+fun ListaPermissoes(estado: EstadoPermissoes, mostrarConcedidas: Boolean = true, forcarInicioAutomatico: Boolean = false) {
     val context = LocalContext.current
     val pedirNotificacoes = lembrarPedidoNotificacoes()
     var ajudaRestrita by remember { mutableStateOf(false) }
@@ -147,6 +178,21 @@ fun ListaPermissoes(estado: EstadoPermissoes, mostrarConcedidas: Boolean = true)
                     Text("Aparece “configuração restrita”?")
                 }
             }
+        }
+        // Só na Xiaomi. Quando não dá para ler o estado, aparece em Ajustes e quando a vigia não inicia.
+        if (Acessos.ehXiaomi && (mostrarConcedidas || forcarInicioAutomatico || estado.inicioAutomatico == false)) {
+            LinhaPermissao(
+                icone = Icons.Rounded.RestartAlt,
+                titulo = "Início automático (Xiaomi)",
+                texto = if (estado.inicioAutomatico == null) {
+                    "Confira se está ligado: sem ele, a MIUI não deixa a vigia voltar depois que o app fecha."
+                } else {
+                    "Sem ele, a MIUI não deixa a vigia voltar depois que o app fecha."
+                },
+                concedida = estado.inicioAutomatico == true,
+                onPermitir = { Acessos.abrirInicioAutomatico(context) },
+                rotuloBotao = if (estado.inicioAutomatico == null) "Abrir" else "Permitir",
+            )
         }
         if (mostrarConcedidas || !estado.acessoUso) {
             LinhaPermissao(
@@ -206,6 +252,7 @@ private fun LinhaPermissao(
     texto: String,
     concedida: Boolean,
     onPermitir: () -> Unit,
+    rotuloBotao: String = "Permitir",
 ) {
     val cores = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -224,7 +271,7 @@ private fun LinhaPermissao(
             Text(texto, style = MaterialTheme.typography.bodySmall, color = cores.onSurfaceVariant)
         }
         if (!concedida) {
-            FilledTonalButton(onClick = onPermitir) { Text("Permitir") }
+            FilledTonalButton(onClick = onPermitir) { Text(rotuloBotao) }
         }
     }
 }

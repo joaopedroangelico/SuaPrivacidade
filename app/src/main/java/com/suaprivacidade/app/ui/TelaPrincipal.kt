@@ -1,5 +1,16 @@
 package com.suaprivacidade.app.ui
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.rounded.Checklist
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.SelectAll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
@@ -81,6 +92,8 @@ import com.suaprivacidade.app.data.inicioMillis
 import com.suaprivacidade.app.ui.theme.escuro
 import com.suaprivacidade.app.vigia.Acessos
 import com.suaprivacidade.app.vigia.Vigia
+import com.suaprivacidade.app.vigia.VigiaService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val NENHUM = -1L
@@ -107,6 +120,8 @@ fun TelaPrincipal(
     val apps by vm.apps.collectAsStateWithLifecycle()
     val resumosApps by vm.resumosApps.collectAsStateWithLifecycle()
     val bemEstar by vm.bemEstar.collectAsStateWithLifecycle()
+    val selecao by vm.selecao.collectAsStateWithLifecycle()
+    val pedirSenha = lembrarPedidoSenha()
     val vigiaAtiva by Vigia.ativa.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -119,6 +134,23 @@ fun TelaPrincipal(
     var usoAberto by rememberSaveable { mutableLongStateOf(NENHUM) }
     var ocultarAvisoIncompleto by rememberSaveable { mutableStateOf(false) }
     var mostrarSistema by rememberSaveable { mutableStateOf(false) }
+    var confirmarApagarNotificacoes by rememberSaveable { mutableStateOf(false) }
+    // Ids das notificações visíveis no Histórico (respeita o filtro por app): o "Todas" da seleção.
+    val idsVisiveis = ui.diasNotificacoes.flatMap { d -> d.notificacoes.map { it.id } }
+
+    BackHandler(enabled = selecao != null) { vm.sairDaSelecao() }
+
+    // Acesso ligado mas vigia parada: pede para religar e, se em 3 s ela não subir, avisa
+    // (na Xiaomi, quase sempre é o "Início automático" desligado).
+    var vigiaParada by remember { mutableStateOf(false) }
+    LaunchedEffect(permissoes.leitor, vigiaAtiva) {
+        vigiaParada = false
+        if (permissoes.leitor && !vigiaAtiva) {
+            VigiaService.religar(context)
+            delay(3_000)
+            vigiaParada = true
+        }
+    }
 
     LaunchedEffect(abaPedida) {
         if (abaPedida != null) {
@@ -172,7 +204,16 @@ fun TelaPrincipal(
             }
         },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
+            val marcadas = selecao
+            if (marcadas != null) {
+                BarraSelecao(
+                    quantidade = marcadas.size,
+                    todasMarcadas = idsVisiveis.isNotEmpty() && marcadas.containsAll(idsVisiveis),
+                    onTodas = { marcar -> vm.marcarVarias(idsVisiveis, marcar) },
+                    onCancelar = vm::sairDaSelecao,
+                    onApagar = { confirmarApagarNotificacoes = true },
+                )
+            } else NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer) {
                 Aba.entries.forEach { aba ->
                     NavigationBarItem(
                         selected = ui.aba == aba,
@@ -209,12 +250,12 @@ fun TelaPrincipal(
 
                 when (ui.aba) {
                     Aba.INICIO -> {
-                        item(key = "resumo") { CartaoResumo(ui.resumo, vigiaAtiva && permissoes.leitor) }
-                        if (!permissoes.leitor || (permissoes.faltaAlgo && !ocultarAvisoIncompleto)) {
+                        item(key = "resumo") { CartaoResumo(ui.resumo, vigiaAtiva && permissoes.leitor, permissoes.leitor) }
+                        if (!permissoes.leitor || vigiaParada || (permissoes.faltaAlgo && !ocultarAvisoIncompleto)) {
                             item(key = "permissoes") {
                                 Column(Modifier.animateItem()) {
-                                    CartaoPermissoes(permissoes)
-                                    if (permissoes.leitor) {
+                                    CartaoPermissoes(permissoes, vigiaParada)
+                                    if (permissoes.leitor && !vigiaParada) {
                                         TextButton(onClick = { ocultarAvisoIncompleto = true }, modifier = Modifier.align(Alignment.End)) {
                                             Text("Agora não")
                                         }
@@ -323,6 +364,22 @@ fun TelaPrincipal(
                                     item(key = "vazio-notificacoes") {
                                         EstadoVazioHistorico(ui.tipoHistorico, ui.filtroApp != null, Modifier.animateItem())
                                     }
+                                } else if (selecao == null) {
+                                    item(key = "selecionar") {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.animateItem()) {
+                                            Text(
+                                                "Toque longo numa notificação para selecionar",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                            TextButton(onClick = { vm.entrarNaSelecao() }) {
+                                                Icon(Icons.Rounded.Checklist, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(Modifier.width(6.dp))
+                                                Text("Selecionar")
+                                            }
+                                        }
+                                    }
                                 }
                                 items(ui.diasNotificacoes, key = { chaveDiaNotificacoes(it.dia) }) { dia ->
                                     GavetaDiaNotificacoes(
@@ -330,7 +387,11 @@ fun TelaPrincipal(
                                         hoje = hoje,
                                         aberta = chaveDiaNotificacoes(dia.dia) in ui.abertas,
                                         nome = ui::nome,
+                                        selecao = selecao,
                                         onAlternar = { vm.alternarGaveta(chaveDiaNotificacoes(dia.dia)) },
+                                        onAlternarSelecao = vm::alternarSelecao,
+                                        onEntrarNaSelecao = vm::entrarNaSelecao,
+                                        onMarcarDia = vm::marcarVarias,
                                         modifier = Modifier.animateItem(),
                                     )
                                 }
@@ -470,8 +531,37 @@ fun TelaPrincipal(
                 ajustesAbertos = false
                 escolhendo = Escolha.OCULTOS
             },
-            onApagarHistorico = vm::apagarHistorico,
+            onApagarHistorico = { pedirSenha("Para apagar todo o histórico") { vm.apagarHistorico() } },
             secaoArmazenamento = { SecaoArmazenamento(vm) },
+        )
+    }
+
+    val marcadas = selecao?.size ?: 0
+    if (confirmarApagarNotificacoes && marcadas > 0) {
+        AlertDialog(
+            onDismissRequest = { confirmarApagarNotificacoes = false },
+            icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+            title = { Text(if (marcadas == 1) "Apagar 1 notificação?" else "Apagar $marcadas notificações?") },
+            text = {
+                Text(
+                    if (temSenhaNoCelular(context)) {
+                        "Elas saem do histórico do Sua Privacidade (não da barra do celular). Para confirmar, " +
+                            "o Android vai pedir a senha de bloqueio do celular."
+                    } else {
+                        "Elas saem do histórico do Sua Privacidade (não da barra do celular). Seu celular não " +
+                            "tem senha de bloqueio, então não dá para confirmar com senha."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmarApagarNotificacoes = false
+                    pedirSenha(if (marcadas == 1) "Para apagar 1 notificação" else "Para apagar $marcadas notificações") {
+                        vm.apagarSelecionadas()
+                    }
+                }) { Text("Apagar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmarApagarNotificacoes = false }) { Text("Cancelar") } },
         )
     }
 
@@ -483,6 +573,52 @@ fun TelaPrincipal(
             text = { Text(TEXTO_COMO_FUNCIONA) },
             confirmButton = { TextButton(onClick = vm::marcarAvisoLido) { Text("Entendi") } },
         )
+    }
+}
+
+/** Barra inferior do modo de seleção: quantas marcadas, marcar todas, cancelar e apagar. */
+@Composable
+private fun BarraSelecao(
+    quantidade: Int,
+    todasMarcadas: Boolean,
+    onTodas: (Boolean) -> Unit,
+    onCancelar: () -> Unit,
+    onApagar: () -> Unit,
+) {
+    val cores = MaterialTheme.colorScheme
+    Surface(color = cores.surfaceContainer) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+        ) {
+            IconButton(onClick = onCancelar) { Icon(Icons.Rounded.Close, contentDescription = "Sair da seleção") }
+            Text(
+                when (quantidade) {
+                    0 -> "Nenhuma marcada"
+                    1 -> "1 marcada"
+                    else -> "$quantidade marcadas"
+                },
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { onTodas(!todasMarcadas) }) {
+                Icon(Icons.Rounded.SelectAll, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (todasMarcadas) "Nenhuma" else "Todas")
+            }
+            Button(
+                onClick = onApagar,
+                enabled = quantidade > 0,
+                colors = ButtonDefaults.buttonColors(containerColor = cores.error, contentColor = cores.onError),
+            ) {
+                Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Apagar")
+            }
+        }
     }
 }
 
@@ -501,7 +637,7 @@ private fun Cabecalho(texto: String, onAjustes: () -> Unit) {
 
 /** Situação agora (vigia ligada, sensor em uso) e o placar do dia. */
 @Composable
-private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean) {
+private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boolean) {
     val cores = MaterialTheme.colorScheme
     // No escuro, o primário é claro demais para um bloco grande: usa o container (fundo escuro, texto claro).
     val base = when {
@@ -533,7 +669,11 @@ private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean) {
     ) {
         Column(Modifier.animateContentSize()) {
             Text(
-                if (vigiando) "Vigiando microfone, câmera e notificações" else "Libere o acesso a notificações abaixo",
+                when {
+                    vigiando -> "Vigiando microfone, câmera e notificações"
+                    temLeitor -> "O celular impediu a vigia de iniciar"
+                    else -> "Libere o acesso a notificações abaixo"
+                },
                 style = MaterialTheme.typography.labelLarge,
                 color = texto.copy(alpha = 0.85f),
             )

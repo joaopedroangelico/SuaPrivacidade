@@ -204,7 +204,8 @@ fun FolhaAjustes(
             text = {
                 Text(
                     "Somem todos os registros de microfone, câmera, notificações e mudanças de permissão. " +
-                        "Os apps supervisionados e os ajustes continuam. Não dá para desfazer.",
+                        "Os apps supervisionados e os ajustes continuam. Não dá para desfazer: por isso o Android vai pedir " +
+                        "a senha de bloqueio do celular para confirmar.",
                 )
             },
             confirmButton = {
