@@ -144,9 +144,10 @@ fun TelaPrincipal(
     // Acesso ligado mas vigia parada: pede para religar e, se em 3 s ela não subir, avisa
     // (na Xiaomi, quase sempre é o "Início automático" desligado).
     var vigiaParada by remember { mutableStateOf(false) }
-    LaunchedEffect(permissoes.leitor, vigiaAtiva) {
+    val pausada = preferencias.vigiaPausada
+    LaunchedEffect(permissoes.leitor, vigiaAtiva, pausada) {
         vigiaParada = false
-        if (permissoes.leitor && !vigiaAtiva) {
+        if (permissoes.leitor && !vigiaAtiva && !pausada) {
             VigiaService.religar(context)
             delay(3_000)
             vigiaParada = true
@@ -254,6 +255,8 @@ fun TelaPrincipal(
                         item(key = "resumo") {
                             // Só com a vigia desligada: leva à configuração que está faltando.
                             val ligarVigia: (() -> Unit)? = when {
+                                // Desligada pelo usuário: religa direto (e, se faltar o acesso, ele aparece depois).
+                                pausada -> vm::ligarVigia
                                 !permissoes.leitor -> {
                                     { Acessos.abrirLeitorNotificacoes(context) }
                                 }
@@ -268,9 +271,9 @@ fun TelaPrincipal(
                                 }
                                 else -> null
                             }
-                            CartaoResumo(ui.resumo, vigiaAtiva && permissoes.leitor, permissoes.leitor, ligarVigia)
+                            CartaoResumo(ui.resumo, vigiaAtiva && permissoes.leitor && !pausada, permissoes.leitor, pausada, ligarVigia)
                         }
-                        if (!permissoes.leitor || vigiaParada || (permissoes.faltaAlgo && !ocultarAvisoIncompleto)) {
+                        if (!pausada && (!permissoes.leitor || vigiaParada || (permissoes.faltaAlgo && !ocultarAvisoIncompleto))) {
                             item(key = "permissoes") {
                                 Column(Modifier.animateItem()) {
                                     CartaoPermissoes(permissoes, vigiaParada)
@@ -551,6 +554,9 @@ fun TelaPrincipal(
                 escolhendo = Escolha.OCULTOS
             },
             onApagarHistorico = { pedirSenha("Para apagar todo o histórico") { vm.apagarHistorico() } },
+            vigiaAtiva = vigiaAtiva && permissoes.leitor,
+            onDesligarVigia = vm::desligarVigia,
+            onLigarVigia = vm::ligarVigia,
             secaoArmazenamento = { SecaoArmazenamento(vm) },
         )
     }
@@ -656,15 +662,24 @@ private fun Cabecalho(texto: String, onAjustes: () -> Unit) {
 
 /** Situação agora (vigia ligada, sensor em uso) e o placar do dia. */
 @Composable
-private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boolean, onLigarVigia: (() -> Unit)?) {
+private fun CartaoResumo(
+    resumo: ResumoHoje,
+    vigiando: Boolean,
+    temLeitor: Boolean,
+    pausada: Boolean,
+    onLigarVigia: (() -> Unit)?,
+) {
     val cores = MaterialTheme.colorScheme
     // No escuro, o primário é claro demais para um bloco grande: usa o container (fundo escuro, texto claro).
+    // Pausada pelo usuário não é erro: fica num tom neutro.
     val base = when {
+        pausada -> if (cores.escuro) cores.surfaceContainerHighest else cores.secondary
         !vigiando -> if (cores.escuro) cores.errorContainer else cores.error
         cores.escuro -> cores.primaryContainer
         else -> cores.primary
     }
     val texto = when {
+        pausada -> if (cores.escuro) cores.onSurface else cores.onSecondary
         !vigiando -> if (cores.escuro) cores.onErrorContainer else cores.onError
         cores.escuro -> cores.onPrimaryContainer
         else -> cores.onPrimary
@@ -672,6 +687,7 @@ private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boole
     val fundo = Brush.linearGradient(listOf(base, lerp(base, Color.Black, 0.22f)))
     val emUso = resumo.emUso
     val manchete = when {
+        pausada -> "Vigia pausada"
         !vigiando -> "Vigia desligada"
         Sensor.MICROFONE in emUso && Sensor.CAMERA in emUso -> "Microfone e câmera em uso"
         Sensor.MICROFONE in emUso -> "Microfone em uso agora"
@@ -689,6 +705,7 @@ private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boole
         Column(Modifier.animateContentSize()) {
             Text(
                 when {
+                    pausada -> "Você desligou a vigia nos Ajustes"
                     vigiando -> "Vigiando microfone, câmera e notificações"
                     temLeitor -> "O celular impediu a vigia de iniciar"
                     else -> "Libere o acesso a notificações abaixo"

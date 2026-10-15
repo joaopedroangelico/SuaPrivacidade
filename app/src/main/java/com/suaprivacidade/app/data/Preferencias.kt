@@ -27,6 +27,8 @@ data class Preferencias(
     val textoOculto: Set<String> = emptySet(),
     /** O usuário já leu o que o app consegue (e não consegue) fazer. */
     val avisoLido: Boolean = false,
+    /** O usuário desligou a vigia nos Ajustes: ela não religa sozinha (nem ao reiniciar o celular). */
+    val vigiaPausada: Boolean = false,
 )
 
 const val DIAS_HISTORICO_PADRAO = 30
@@ -39,6 +41,7 @@ class PreferenciasRepo(private val context: Context) {
     private val chaveDias = intPreferencesKey("dias_historico")
     private val chaveOculto = stringSetPreferencesKey("texto_oculto")
     private val chaveAviso = booleanPreferencesKey("aviso_lido")
+    private val chavePausada = booleanPreferencesKey("vigia_pausada")
 
     val preferencias: Flow<Preferencias> = context.dataStore.data.map { p ->
         Preferencias(
@@ -46,6 +49,7 @@ class PreferenciasRepo(private val context: Context) {
             diasHistorico = p[chaveDias] ?: DIAS_HISTORICO_PADRAO,
             textoOculto = p[chaveOculto].orEmpty(),
             avisoLido = p[chaveAviso] ?: false,
+            vigiaPausada = p[chavePausada] ?: false,
         )
     }
 
@@ -62,6 +66,10 @@ class PreferenciasRepo(private val context: Context) {
             val atual = it[chaveOculto].orEmpty()
             it[chaveOculto] = if (pacote in atual) atual - pacote else atual + pacote
         }
+    }
+
+    suspend fun definirVigiaPausada(pausada: Boolean) {
+        context.dataStore.edit { it[chavePausada] = pausada }
     }
 
     suspend fun marcarAvisoLido() {

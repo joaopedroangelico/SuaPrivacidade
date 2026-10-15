@@ -108,7 +108,12 @@ class Vigia(private val servico: VigiaService) {
 
     fun iniciar() {
         estaAtiva.value = true
-        escopo.launch { PreferenciasRepo(context).preferencias.collect { prefs = it } }
+        escopo.launch {
+            PreferenciasRepo(context).preferencias.collect {
+                prefs = it
+                if (it.vigiaPausada) principal.post { servico.desligar() }
+            }
+        }
         escopo.launch {
             banco.supervisionadoDao().observarTodos().collect { lista -> supervisionados = lista.map { it.pacote }.toSet() }
         }

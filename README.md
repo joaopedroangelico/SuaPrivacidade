@@ -2,7 +2,7 @@
 
 App Android que vigia o microfone e a câmera do celular: avisa quando algum app liga um deles fora da tela, guarda o histórico de usos e de notificações e acompanha de perto os apps que você escolher.
 
-> Versão **1.0.0.0 beta**. Baixe o APK em [Releases](https://github.com/joaopedroangelico/SuaPrivacidade/releases). Mesmo estilo e base técnica do [Contas em Dia](https://github.com/joaopedroangelico/ContasEmDia) e do [Doses](https://github.com/joaopedroangelico/Doses).
+> Versão **1.1.0.0 beta**. Baixe o APK em [Releases](https://github.com/joaopedroangelico/SuaPrivacidade/releases). Mesmo estilo e base técnica do [Contas em Dia](https://github.com/joaopedroangelico/ContasEmDia) e do [Doses](https://github.com/joaopedroangelico/Doses).
 
 ## Funcionalidades
 
@@ -19,7 +19,7 @@ App Android que vigia o microfone e a câmera do celular: avisa quando algum app
   - **Microfone e câmera**: horário, duração, app provável e a situação (com o app aberto, fora da tela, tela apagada, em ligação, barrado pelo Android).
   - **Notificações**: app, horário, título e texto de cada notificação recebida (toque para ver o texto inteiro). Apps marcados como **texto oculto** ficam só com o app e o horário. Para **apagar**, toque em "Selecionar" (ou dê um toque longo numa notificação) e marque uma a uma, um dia inteiro ou **todas** de uma vez.
 - **Auditoria**: todos os apps com permissão de microfone e/ou câmera, com o último uso registrado. Um toque abre a tela de permissões do app no Android, para trocar para "Perguntar sempre" ou "Não permitir".
-- **Ajustes**: tema, prazo do histórico (7, 30 ou 90 dias; padrão 30), apps com texto oculto, permissões, armazenamento e "apagar todo o histórico".
+- **Ajustes**: ligar e **desligar a vigia** (desligada, ela não religa sozinha nem depois de reiniciar o celular; o histórico guardado continua), tema, prazo do histórico (7, 30 ou 90 dias; padrão 30), apps com texto oculto, permissões, armazenamento e "apagar todo o histórico".
 - **Senha para apagar**: apagar notificações ou o histórico inteiro pede a senha de bloqueio do celular (PIN, padrão ou senha).
 - **Temas**: Sistema, Lavanda, Menta, Pêssego, Oceano (padrão) e Rosé, no modo claro/escuro do celular.
 

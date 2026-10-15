@@ -5,6 +5,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.suaprivacidade.app.data.PreferenciasRepo
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Leitor de notificações. Além de guardar o histórico, ele hospeda a [Vigia]: o Android mantém
@@ -12,10 +17,23 @@ import android.service.notification.StatusBarNotification
  */
 class VigiaService : NotificationListenerService() {
     private var vigia: Vigia? = null
+    private val escopo = MainScope()
 
     override fun onListenerConnected() {
-        vigia?.parar()
-        vigia = Vigia(this).also { it.iniciar() }
+        escopo.launch {
+            // Pausada nos Ajustes: o Android religa o leitor (ex.: ao reiniciar), e ele se desliga.
+            if (PreferenciasRepo(applicationContext).preferencias.first().vigiaPausada) {
+                desligar()
+            } else {
+                vigia?.parar()
+                vigia = Vigia(this@VigiaService).also { it.iniciar() }
+            }
+        }
+    }
+
+    /** Pede ao Android para soltar o leitor; ele só volta com [religar]. */
+    fun desligar() {
+        runCatching { requestUnbind() }
     }
 
     override fun onListenerDisconnected() {
@@ -26,6 +44,7 @@ class VigiaService : NotificationListenerService() {
     override fun onDestroy() {
         vigia?.parar()
         vigia = null
+        escopo.cancel()
         super.onDestroy()
     }
 

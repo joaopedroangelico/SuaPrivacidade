@@ -22,6 +22,7 @@ import com.suaprivacidade.app.data.UsoSensor
 import com.suaprivacidade.app.data.emDataHora
 import com.suaprivacidade.app.data.inicioMillis
 import com.suaprivacidade.app.data.medirArmazenamento
+import com.suaprivacidade.app.vigia.VigiaService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -465,6 +466,18 @@ class PrivacidadeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun alternarTextoOculto(pacote: String) {
         viewModelScope.launch { prefsRepo.alternarTextoOculto(pacote) }
+    }
+
+    /** Desliga a vigia até o usuário ligar de novo (o histórico guardado continua). */
+    fun desligarVigia() {
+        viewModelScope.launch { prefsRepo.definirVigiaPausada(true) }
+    }
+
+    fun ligarVigia() {
+        viewModelScope.launch {
+            prefsRepo.definirVigiaPausada(false)
+            VigiaService.religar(getApplication())
+        }
     }
 
     fun marcarAvisoLido() {

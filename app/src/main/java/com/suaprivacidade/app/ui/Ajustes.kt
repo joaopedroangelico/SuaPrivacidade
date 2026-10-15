@@ -31,6 +31,10 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.PowerSettingsNew
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -80,6 +84,10 @@ fun FolhaAjustes(
     onTirarOculto: (String) -> Unit,
     onEscolherOcultos: () -> Unit,
     onApagarHistorico: () -> Unit,
+    /** A vigia está rodando agora. */
+    vigiaAtiva: Boolean,
+    onDesligarVigia: () -> Unit,
+    onLigarVigia: () -> Unit,
     /** Espaço ocupado (precisa do ViewModel, por isso vem pronta de fora). */
     secaoArmazenamento: @Composable () -> Unit,
 ) {
@@ -87,6 +95,7 @@ fun FolhaAjustes(
     val cores = MaterialTheme.colorScheme
     val permissoes = lembrarPermissoes()
     var confirmarApagar by remember { mutableStateOf(false) }
+    var confirmarDesligar by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onFechar,
@@ -121,6 +130,35 @@ fun FolhaAjustes(
                             modifier = Modifier.weight(1f),
                         )
                     }
+                }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 4.dp), color = cores.outlineVariant)
+            TituloSecao(Icons.Rounded.PowerSettingsNew, "Vigia")
+            Text(
+                when {
+                    preferencias.vigiaPausada -> "Desligada por você. Nada novo é registrado até você ligar de novo."
+                    vigiaAtiva -> "Ligada: registrando microfone, câmera e notificações."
+                    else -> "Desligada: falta alguma permissão (veja abaixo, em Permissões)."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = cores.onSurfaceVariant,
+            )
+            if (preferencias.vigiaPausada) {
+                FilledTonalButton(onClick = onLigarVigia, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Ligar a vigia")
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { confirmarDesligar = true },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = cores.error),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Desligar a vigia")
                 }
             }
 
@@ -194,6 +232,27 @@ fun FolhaAjustes(
             HorizontalDivider(Modifier.padding(vertical = 4.dp), color = cores.outlineVariant)
             SecaoSobre()
         }
+    }
+
+    if (confirmarDesligar) {
+        AlertDialog(
+            onDismissRequest = { confirmarDesligar = false },
+            icon = { Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null) },
+            title = { Text("Desligar a vigia?") },
+            text = {
+                Text(
+                    "O app para de registrar microfone, câmera e notificações e de avisar sobre usos suspeitos, " +
+                        "até você ligar de novo (mesmo depois de reiniciar o celular). O histórico já guardado continua.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmarDesligar = false
+                    onDesligarVigia()
+                }) { Text("Desligar", color = cores.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmarDesligar = false }) { Text("Cancelar") } },
+        )
     }
 
     if (confirmarApagar) {
