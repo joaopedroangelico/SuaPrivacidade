@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Policy
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Visibility
@@ -250,7 +251,25 @@ fun TelaPrincipal(
 
                 when (ui.aba) {
                     Aba.INICIO -> {
-                        item(key = "resumo") { CartaoResumo(ui.resumo, vigiaAtiva && permissoes.leitor, permissoes.leitor) }
+                        item(key = "resumo") {
+                            // Só com a vigia desligada: leva à configuração que está faltando.
+                            val ligarVigia: (() -> Unit)? = when {
+                                !permissoes.leitor -> {
+                                    { Acessos.abrirLeitorNotificacoes(context) }
+                                }
+                                vigiaParada -> {
+                                    {
+                                        when {
+                                            Acessos.ehXiaomi && permissoes.inicioAutomatico != true -> Acessos.abrirInicioAutomatico(context)
+                                            !permissoes.bateria -> Acessos.abrirEconomiaDeBateria(context)
+                                            else -> VigiaService.religar(context)
+                                        }
+                                    }
+                                }
+                                else -> null
+                            }
+                            CartaoResumo(ui.resumo, vigiaAtiva && permissoes.leitor, permissoes.leitor, ligarVigia)
+                        }
                         if (!permissoes.leitor || vigiaParada || (permissoes.faltaAlgo && !ocultarAvisoIncompleto)) {
                             item(key = "permissoes") {
                                 Column(Modifier.animateItem()) {
@@ -637,7 +656,7 @@ private fun Cabecalho(texto: String, onAjustes: () -> Unit) {
 
 /** Situação agora (vigia ligada, sensor em uso) e o placar do dia. */
 @Composable
-private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boolean) {
+private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boolean, onLigarVigia: (() -> Unit)?) {
     val cores = MaterialTheme.colorScheme
     // No escuro, o primário é claro demais para um bloco grande: usa o container (fundo escuro, texto claro).
     val base = when {
@@ -683,6 +702,20 @@ private fun CartaoResumo(resumo: ResumoHoje, vigiando: Boolean, temLeitor: Boole
                 label = "manchete",
             ) { m ->
                 Text(m, style = MaterialTheme.typography.headlineMedium, color = texto, maxLines = 2)
+            }
+            if (onLigarVigia != null) {
+                Button(
+                    onClick = onLigarVigia,
+                    colors = ButtonDefaults.buttonColors(containerColor = texto, contentColor = base),
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .fillMaxWidth()
+                        .height(48.dp),
+                ) {
+                    Icon(Icons.Rounded.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ligar a vigia", style = MaterialTheme.typography.titleMedium)
+                }
             }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

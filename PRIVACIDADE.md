@@ -50,10 +50,10 @@ Essas informações são lidas na hora, só para mostrar na tela.
 
 - **Apagar notificações:** no Histórico, toque em *Selecionar* (ou dê um toque longo numa notificação), marque uma, várias, um dia inteiro ou todas, e toque em *Apagar*.
 - **Apagar o histórico:** *Ajustes → Histórico → Apagar todo o histórico agora*.
-
-Para apagar, o app pede a senha de bloqueio do celular (PIN, padrão ou senha), para que outra pessoa com o celular desbloqueado não consiga apagar o histórico.
 - **Tirar um app da supervisão:** abra a ficha dele e toque em "Parar de supervisionar".
 - **Apagar tudo:** desinstale o app ou use *Configurações do Android → Apps → Sua Privacidade → Armazenamento → Limpar dados*.
+
+Para apagar notificações ou o histórico, o app pede a senha de bloqueio do celular (PIN, padrão ou senha), para que outra pessoa com o celular desbloqueado não consiga apagar nada.
 
 Não existe cópia fora do aparelho: dados apagados não podem ser recuperados.
 
