@@ -2,7 +2,7 @@
 
 App Android que vigia o microfone e a câmera do celular: avisa quando algum app liga um deles fora da tela, guarda o histórico de usos e de notificações e acompanha de perto os apps que você escolher.
 
-> Versão **1.0.0.0 beta**. Mesmo estilo e base técnica do [Contas em Dia](https://github.com/joaopedroangelico/ContasEmDia) e do [Doses](https://github.com/joaopedroangelico/Doses).
+> Versão **1.0.0.0 beta**. Baixe o APK em [Releases](https://github.com/joaopedroangelico/SuaPrivacidade/releases). Mesmo estilo e base técnica do [Contas em Dia](https://github.com/joaopedroangelico/ContasEmDia) e do [Doses](https://github.com/joaopedroangelico/Doses).
 
 ## Funcionalidades
 
